@@ -5,28 +5,29 @@ from util import hook, http
 #@hook.nonick
 @hook.command
 def fchewy(inp):
-  return "fchewy"
+  return "lol chewylsb sucks"
  
 def stringify_card(card):
   types = [t.capitalize() for t in card['types']]
 #  for m_type in card['types']:
 #    types.append(type.capitalize())
   if 'subtypes' in card:
+    types.extend("-")
     types.extend([t.capitalize() for t in card['subtypes']])
     #for type in card['subtypes']:
     #  types.append(type.capitalize())
 
   # TODO: Deal with {2/W}-style stuff
   card['cost'] = card['cost'].replace('{','').replace('}','')
-  card['cost'] = card['cost'] + " | "
 
   card['text'] = card['text'].replace('\n', ' ')
 
   e_seen = set()
+  # Relying on magic sets having unique abbreviations
   editions = [e for e in card['editions']
     if e['set_id'][:1] != "p"
-    and e not in e_seen
-    and not e_seen.add(e)]
+    and e['set_id'] not in e_seen
+    and not e_seen.add(e['set_id'])]
   #for e in card['editions']:
   #  if e['set_id'][:1] != "p":
       #addedition = edition['set_id'] + " (" + edition['rarity'][:1].upper() + ") "
@@ -52,7 +53,7 @@ def stringify_card(card):
     for e in editions[:5]]
   if len(editions) > 5:
     s_editions.append("...")
-  return "%s | %s | %s%s | %s| %s" % (card['name'], 
+  return "%s | %s | %s | %s | %s | %s" % (card['name'], 
     " ".join(types), card['cost'], card['text'], 
     " ".join(s_editions), prices)
 #end stringify_card
@@ -66,7 +67,8 @@ def mtg(inp):
 
   #TODO: Handle other input filters
   exact = inp[:1] == "!"
-  if exact:
+  approx = inp[:1] == "~"
+  if exact or approx:
     inp = inp[1:]
   result = http.get_json("http://api.deckbrew.com/mtg/cards", name=inp)
 
@@ -78,15 +80,12 @@ def mtg(inp):
 
   elif len(result) > 1: 
     inp_l = inp.lower()
-    if exact == True:
-      match = filter(lambda c: c['name'].lower() == inp_l, result)
-      if match:
-        return stringify_card(match[0])
-      else:
-        #TODO: List non-matching cards?
-        return "No exact match found."
-      #end if match
-
+    match = filter(lambda c: c['name'].lower() == inp_l, result)
+    if match and not approx:
+      return stringify_card(match[0])
+    elif exact:
+      #TODO: List non-matching cards?
+      return "No exact match found."
     else:
       # There is no exact match
       close_matches = filter(lambda c: inp_l in c['name'].lower(), result)
@@ -96,8 +95,7 @@ def mtg(inp):
       else:
         return "Potential matches: %s" % ", ".join(
           [c['name'] for c in result[:20]])
-      #end if
-    #end if exact or not
+    #end if
   #end if number of results
 
   return "Potential matches: %s" % ", ".join(
